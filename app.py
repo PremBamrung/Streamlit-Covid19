@@ -28,6 +28,7 @@ def load_data():
     df3=pd.merge(df,df1,on=['Province/State',"Country/Region","Lat","Long","Date"])
     df3=pd.merge(df3,df2,on=['Province/State',"Country/Region","Lat","Long","Date"])
     df3["Active"]=df3.Confirmed-df3.Dead-df3.Recovered
+    df3["Province/State"]=df3["Province/State"].fillna(df3["Country/Region"])
     return df3
 
 st.title('Interactive Covid19 Dashboard ')
@@ -43,7 +44,7 @@ features=["Confirmed","Dead","Recovered","Active"]
 
 #region Sidebar
 st.sidebar.title('Side Bar')
-mode=st.sidebar.selectbox("Chose your chapter :",["Intro","Overview","Country","Map","Flourish","About"])
+mode=st.sidebar.selectbox("Chose your chapter :",["Intro","Overview","Country","Map","Flourish","Similar epidemics","About"])
 
 temp = df.groupby('Date')['Confirmed', 'Dead', 'Recovered', 'Active'].sum().reset_index()
 temp = temp[temp['Date']==max(temp['Date'])].reset_index(drop=True)
@@ -131,7 +132,7 @@ elif mode =='Overview':
         nb_head = st.slider('Number of rows to show',min_value=5,max_value=1000)
         st.write(df.head(nb_head))
 
-    st.header("Global")
+    st.markdown("<h1 style='text-align: center; color: black;'>GLOBAL CASES</h1>", unsafe_allow_html=True)
 # Scatter line marker
     carotte=df.groupby('Date')[features].sum()
 
@@ -157,6 +158,33 @@ elif mode =='Overview':
         'x':0.5,
         'xanchor': 'center',
         'yanchor': 'top'})
+    st.plotly_chart(fig)
+
+#Daily new cases bar
+    pomme=df.groupby("Date")[features].sum().diff()
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=pomme.index, y=pomme.Confirmed,
+                    
+                    name='Confirmed'))
+    fig.add_trace(go.Bar(x=pomme.index, y=pomme.Dead,
+                    
+                    name='Dead'))
+
+    fig.add_trace(go.Bar(x=pomme.index, y=pomme.Recovered,
+                    
+                    name='Recovered'))            
+
+    fig.add_trace(go.Bar(x=pomme.index, y=pomme.Active,
+                    
+                    name='Active'))    
+    fig.update_layout(height=700, width=900,
+        title={
+        'text': "<b>Daily evolution of new cases globally",
+        'y':0.9,
+        'x':0.5,
+        'xanchor': 'center',
+        'yanchor': 'top'})
+    
     st.plotly_chart(fig)
 
 #Horizontal Bar
@@ -193,7 +221,7 @@ elif mode =='Overview':
     temp = df.groupby('Date')['Confirmed', 'Dead', 'Recovered', 'Active'].sum().reset_index()
     temp = temp[temp['Date']==max(temp['Date'])].reset_index(drop=True)
     tm = temp.melt(id_vars="Date", value_vars=['Active', 'Dead', 'Recovered'])
-    fig = px.treemap(tm, path=["variable"], values="value", height=700, width=900)
+    fig = px.treemap(tm, path=["variable"], values="value", height=700, width=900,color_discrete_sequence=["#636EFA", "#00CC96", "#EF553B"])
     fig.update_layout(title={
         'text': "<b>Treemap of cases",
         'y':0.95,
@@ -204,29 +232,7 @@ elif mode =='Overview':
 
 
 #
-    st.header("Evolution by country/region")
-#Country scatter line
-    selected_country=st.selectbox("Choose your country",sorted(df["Country/Region"].unique()))
-    country=df[(df["Country/Region"]==selected_country)]
-    country=country.groupby("Date")[features].sum()
 
-    fig=go.Figure()
-    fig.add_scatter(x=country.index,y=country["Confirmed"],name="Confirmed")
-    fig.add_scatter(x=country.index,y=country["Dead"],name="Dead")
-    fig.add_scatter(x=country.index,y=country["Active"],name="Active")
-    fig.add_scatter(x=country.index,y=country["Recovered"],name="Recovered")
-    
-    fig.update_layout(
-        title={
-        'text': f"<b>Evolution of cases for {selected_country}",
-        'y':0.9,
-        'x':0.5,
-        'xanchor': 'center',
-        'yanchor': 'top'},
-        xaxis_title="Time",
-        yaxis_title="Population",
-        height=700, width=900)
-    st.plotly_chart(fig)
 
 #Total Confirmed
     
@@ -301,22 +307,86 @@ elif mode =='Overview':
     st.dataframe(kiwi.style.background_gradient(cmap='Reds'))
 
 elif mode =='Country':
-    st.header("This chapter is in construction ... More to come soon. You can still see the over chapter on the Side Bar (left).")
+    st.header("Evolution by country/region")
+#Country scatter line
+    selected_country=st.selectbox("Choose your country",sorted(df["Country/Region"].unique()))
+    province=st.checkbox('Show province/state',key='province')
+    if province:
+        selected_country=st.selectbox("Choose your province/state",sorted(df[df["Country/Region"]==selected_country]["Province/State"].unique()))
+        country=df[(df["Province/State"]==selected_country)]
 
+    else:
+        country=df[(df["Country/Region"]==selected_country)]
+
+
+
+    
+    country=country.groupby("Date")[features].sum()
+
+    fig=go.Figure()
+    fig.add_scatter(x=country.index,y=country["Confirmed"],name="Confirmed")
+    fig.add_scatter(x=country.index,y=country["Dead"],name="Dead")
+    fig.add_scatter(x=country.index,y=country["Active"],name="Active")
+    fig.add_scatter(x=country.index,y=country["Recovered"],name="Recovered")
+    
+    fig.update_layout(
+        title={
+        'text': f"<b>Evolution of cases for {selected_country}",
+        'y':0.9,
+        'x':0.5,
+        'xanchor': 'center',
+        'yanchor': 'top'},
+        xaxis_title="Time",
+        yaxis_title="Population",
+        height=700, width=900)
+    st.plotly_chart(fig)
+
+
+#Daily new cases bar
+    if province:
+        pomme=df[df["Province/State"]==selected_country].groupby("Date")[features].sum().diff()
+    else :
+        pomme=df[df["Country/Region"]==selected_country].groupby("Date")[features].sum().diff()
+
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=pomme.index, y=pomme.Confirmed,
+                    
+                    name='Confirmed'))
+    fig.add_trace(go.Bar(x=pomme.index, y=pomme.Dead,
+                    
+                    name='Dead'))
+
+    fig.add_trace(go.Bar(x=pomme.index, y=pomme.Recovered,
+                    
+                    name='Recovered'))            
+
+    fig.add_trace(go.Bar(x=pomme.index, y=pomme.Active,
+                    
+                    name='Active'))    
+    fig.update_layout(height=700, width=900,
+        title={
+        'text': "<b>Daily evolution of new cases globally",
+        'y':0.9,
+        'x':0.5,
+        'xanchor': 'center',
+        'yanchor': 'top'})
+    
+    st.plotly_chart(fig)
 elif mode =='Map':
     st.header("This chapter focuses on display on a map the data.")
+    cases=st.radio("Choose the cases to display : ",("Confirmed","Active","Dead","Recovered"))
     df_last_map=df.copy()
     df_last_map["Province/State"]=df_last_map["Province/State"].fillna(df_last_map["Country/Region"])
     df_last_map=df_last_map[df_last_map.Date==max(df_last_map.Date)].groupby('Province/State')[features+["Lat","Long"]].sum()
-    # df_last_map=df_last_map.rename({"Lat":"lat",'Long':'lon'},axis=1)
-    # df_last_map=df_last_map[["lat","lon"]]
     fig = px.scatter_geo(df_last_map, lat='Lat',lon="Long",
 #                      color="continent", # which column to use to set the color of markers
-                     hover_name=df_last_map.index, # column added to hover information
-                     size=df_last_map.Confirmed*100, # size of markers
-                     projection="natural earth")
+        hover_name=df_last_map.index, # column added to hover information
+        size=df_last_map[cases]*100, # size of markers
+        projection="natural earth")
     fig.update_layout(
-        height=900, width=1100)
+        height=900, width=900,
+        margin=dict(l=0, r=0, t=0, b=0))
     st.plotly_chart(fig)
 
 
@@ -336,14 +406,25 @@ elif mode =='Flourish':
     flourish_death="<iframe src='https://public.flourish.studio/visualisation/1628288/embed' frameborder='0' scrolling='no' style='width:150%;height:600px;'></iframe><div style='width:150%!;margin-top:4px!important;text-align:right!important;'><a class='flourish-credit' href='https://public.flourish.studio/visualisation/1628288/?utm_source=embed&utm_campaign=visualisation/1628288' target='_top' style='text-decoration:none!important'><img alt='Made with Flourish' src='https://public.flourish.studio/resources/made_with_flourish.svg' style='width:105px!important;height:16px!important;border:none!important;margin:0!important;'> </a></div>"
     st.markdown(flourish_death, unsafe_allow_html=True)
 
+elif mode =='Similar epidemics':
+    pass
 
 elif mode=="About":
 
     st.write("""
-    Hi, I'm Premchanok BAMRUNG, currently intern Data Scientist. I was working on some data for my company when I thought that it would be a cool idea to use Streamlit to showcase my Exploratory Data Analysis. But then came the Covid 19 crisis and I thought that it would be cool to create another dashboard on my own to monitor cases.
+    Hi, I'm Premchanok BAMRUNG, currently an intern Data Scientist. This side project is about creating a dashboard on my own to monitor cases during this Covid 19 crisis using Python and its Data Science's Ecosystem.
     
-    The idea is to use Streamlit, Heroku, the standard Data Science stack (Pandas, Numpy, Seaborn...) and Flourish to create a really cool dashboard where one can select 
-    whatever to see.
+    The workflow is as the following:
+    * Pull the data from the JHU CSSE Github repository
+    * Do some data wrangling with Pandas 
+    * Plot some graphs with Plotly and Flourish
+    * Create an experimental dashboard using Streamlit
+    * Deploy on Heroku
+
+    The idea is to test Streamlit, as it allows to quickly create interactive website without dealing too much with web development.
+    As it is still in development, Streamlit has some limitations, but what it lacks in layout customization is balanced out with the easy to use API.
+    This is really just an experimental dashboard, if I really wanted to create an awesome dashboard, I would probably use Dash.
+
 
     If you have any suggestions or questions, do not hesitate to contact me.
 
